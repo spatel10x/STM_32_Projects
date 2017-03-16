@@ -16,7 +16,7 @@ void vHardwareSetup(void)
     /* Configure the system clock */
     prvSystemClockConfig();
     xHardwareUartInit();
-
+    xHardwareCANInit();
     /* Initialize all configured peripherals */
     BSP_LED_Init(LED1);
     BSP_LED_Init(LED2);
@@ -46,7 +46,7 @@ void vHardwareSetup(void)
 
 /* System Clock Configuration by ST */
 
-
+//======================have to update it =========================================//
 /**
   * @brief  System Clock Configuration
   *         The system Clock is configured as follow :
@@ -64,46 +64,75 @@ void vHardwareSetup(void)
   * @param  None
   * @retval None
   */
-
+//======================have to update it =========================================//
 void prvSystemClockConfig(void)
 {
+	  RCC_OscInitTypeDef RCC_OscInitStruct;
+	  RCC_ClkInitTypeDef RCC_ClkInitStruct;
 
-	  RCC_ClkInitTypeDef clkinitstruct = {0};
-	  RCC_OscInitTypeDef oscinitstruct = {0};
-
-	  /* Configure PLLs ------------------------------------------------------*/
-	  /* PLL2 configuration: PLL2CLK = (HSE / HSEPrediv2Value) * PLL2MUL = (8 / 2) * 9 = 36 MHz */
-	  /* PREDIV1 configuration: PREDIV1CLK = PLL2CLK / HSEPredivValue = 40 / 5 = 8 MHz */
-	  /* PLL configuration: PLLCLK = PREDIV1CLK * PLLMUL = 8 * 9 = 72 MHz */
-
-	  /* Enable HSE Oscillator and activate PLL with HSE as source */
-	  oscinitstruct.OscillatorType        = RCC_OSCILLATORTYPE_HSE;
-	  oscinitstruct.HSEState              = RCC_HSE_ON;
-	  oscinitstruct.HSEPredivValue        = RCC_HSE_PREDIV_DIV2;
-	  oscinitstruct.Prediv1Source         = RCC_PLLSOURCE_HSE;
-	  oscinitstruct.PLL.PLLState          = RCC_PLL_ON;
-	  oscinitstruct.PLL.PLLSource         = RCC_PLLSOURCE_HSE;
-	  oscinitstruct.PLL.PLLMUL            = RCC_PLL_MUL9;
-	  oscinitstruct.PLL2.PLL2State        = RCC_PLL2_ON;
-	  oscinitstruct.PLL2.PLL2MUL          = RCC_PLL2_MUL8;
-	  oscinitstruct.PLL2.HSEPrediv2Value  = RCC_HSE_PREDIV2_DIV5;
-	  if (HAL_RCC_OscConfig(&oscinitstruct)!= HAL_OK)
+	    /**Initializes the CPU, AHB and APB busses clocks
+	    */
+	  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+	  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+	  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+	  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+	  RCC_OscInitStruct.Prediv1Source = RCC_PREDIV1_SOURCE_HSE;
+	  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+	  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+	  RCC_OscInitStruct.PLL2.PLL2State = RCC_PLL_NONE;
+	  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
 	  {
-	    /* Initialization Error */
-	    while(1);
+	    Error_Handler();
 	  }
 
-	  /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2
-	     clocks dividers */
-	  clkinitstruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
-	  clkinitstruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	  clkinitstruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	  clkinitstruct.APB2CLKDivider = RCC_HCLK_DIV1;
-	  clkinitstruct.APB1CLKDivider = RCC_HCLK_DIV2;
-	  if (HAL_RCC_ClockConfig(&clkinitstruct, FLASH_LATENCY_2)!= HAL_OK)
+	    /**Initializes the CPU, AHB and APB busses clocks
+	    */
+	  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+	                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+	  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
+	  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+	  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
 	  {
-	    /* Initialization Error */
-	    while(1);
+	    Error_Handler();
 	  }
 }
 
+
+void HAL_MspInit(void)
+{
+  /* USER CODE BEGIN MspInit 0 */
+
+  /* USER CODE END MspInit 0 */
+
+  __HAL_RCC_AFIO_CLK_ENABLE();
+
+  HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
+
+  /* System interrupt init*/
+  /* MemoryManagement_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(MemoryManagement_IRQn, 0, 0);
+  /* BusFault_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(BusFault_IRQn, 0, 0);
+  /* UsageFault_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(UsageFault_IRQn, 0, 0);
+  /* SVCall_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(SVCall_IRQn, 0, 0);
+  /* DebugMonitor_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DebugMonitor_IRQn, 0, 0);
+  /* PendSV_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(PendSV_IRQn, 0, 0);
+  /* SysTick_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+
+    /**NOJTAG: JTAG-DP Disabled and SW-DP Enabled
+    */
+  __HAL_AFIO_REMAP_SWJ_NOJTAG();
+
+  /* USER CODE BEGIN MspInit 1 */
+
+  /* USER CODE END MspInit 1 */
+}

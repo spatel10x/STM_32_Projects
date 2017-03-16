@@ -6,10 +6,11 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-osThreadId LEDThread1Handle, LEDThread2Handle;
+osThreadId LEDThread1Handle, LEDThread2Handle, CAN_sendThreadHandle;
 /* Private function prototypes -----------------------------------------------*/
 static void LED_Thread1(void const *argument);
 static void LED_Thread2(void const *argument);
+static void CAN_sendThread(void const *argument);
 void SystemClock_Config(void);
 
 /* Private functions ---------------------------------------------------------*/
@@ -52,11 +53,17 @@ int main(void)
   /*  Thread 2 definition */
   osThreadDef(LED2, LED_Thread2, osPriorityNormal, 0, configMINIMAL_STACK_SIZE);
 
+  /*  Thread 3 definition */
+  osThreadDef(CAN_send, CAN_sendThread, osPriorityNormal, 0, configMINIMAL_STACK_SIZE);
+
   /* Start thread 1 */
   LEDThread1Handle = osThreadCreate(osThread(LED1), NULL);
 
   /* Start thread 2 */
   LEDThread2Handle = osThreadCreate(osThread(LED2), NULL);
+
+  /* Start thread 3 */
+ CAN_sendThreadHandle = osThreadCreate(osThread(CAN_send), NULL);
 
   /* Start scheduler */
   osKernelStart();
@@ -107,7 +114,7 @@ static void LED_Thread1(void const *argument)
       osDelay(400);
     }
 
-    /* Resume Thread 2*/
+    /* Resume Thread 2 */
     osThreadResume(LEDThread2Handle);
   }
 }
@@ -116,7 +123,7 @@ static void LED_Thread1(void const *argument)
   * @brief  Toggle LED2 thread
   * @param  argument not used
   * @retval None
-  */
+  **/
 static void LED_Thread2(void const *argument)
 {
   uint32_t count;
@@ -138,13 +145,43 @@ static void LED_Thread2(void const *argument)
     BSP_LED_Off(LED2);
 
     /* Resume Thread 1 */
-    osThreadResume(LEDThread1Handle);
+    osThreadResume(CAN_sendThread);
 
     /* Suspend Thread 2 */
     osThreadSuspend(NULL);
   }
 }
 
+
+static void CAN_sendThread(void const *argument)
+{
+	  uint32_t count;
+	  (void) argument;
+
+	CAN_Message TXmsg;
+	TXmsg.id = 0x03;
+
+	CANx_Write(&TXmsg);
+
+	 count = osKernelSysTick() + 10000;
+
+	    /* Toggle LED2 every 500 ms for 10 s */
+	    while (count >= osKernelSysTick())
+	    {
+	      BSP_LED_Toggle(LED2);
+
+	      osDelay(500);
+	    }
+
+	    /* Turn off LED2 */
+	    BSP_LED_Off(LED2);
+
+	    /* Resume Thread 1 */
+	    osThreadResume(LEDThread1Handle);
+
+	    /* Suspend Thread 2 */
+	    osThreadSuspend(NULL);
+}
 
 #ifdef  USE_FULL_ASSERT
 

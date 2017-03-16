@@ -91,6 +91,9 @@ static void               SPIx_MspInit(SPI_HandleTypeDef *hspi);
 
 #endif /* HAL_SPI_MODULE_ENABLED */
 
+/* SPIx bus function */
+
+
 
 void BSP_System_Init(void)
 {
@@ -319,21 +322,21 @@ void BSP_CAN_Init(void)
   static CanRxMsgTypeDef        RxMessage;
 
   /*##-1- Configure the CAN peripheral #######################################*/
-  CanHandle.Instance = PSB_CAN;
+  CanHandle.Instance = ((CAN_TypeDef*)CAN1_BASE);
   CanHandle.pTxMsg = &TxMessage;
   CanHandle.pRxMsg = &RxMessage;
 
   CanHandle.Init.TTCM = DISABLE;
-  CanHandle.Init.ABOM = DISABLE;
+  CanHandle.Init.ABOM = ENABLE;
   CanHandle.Init.AWUM = DISABLE;
   CanHandle.Init.NART = DISABLE;
   CanHandle.Init.RFLM = DISABLE;
   CanHandle.Init.TXFP = DISABLE;
   CanHandle.Init.Mode = CAN_MODE_NORMAL;
   CanHandle.Init.SJW = CAN_SJW_1TQ;
-  CanHandle.Init.BS1 = CAN_BS1_9TQ;
-  CanHandle.Init.BS2 = CAN_BS2_8TQ;
-  CanHandle.Init.Prescaler = 2;
+  CanHandle.Init.BS1 = CAN_BS1_8TQ;
+  CanHandle.Init.BS2 = CAN_BS2_3TQ;
+  CanHandle.Init.Prescaler = 3;
 
   if (HAL_CAN_Init(&CanHandle) != HAL_OK)
   {
@@ -373,41 +376,34 @@ void HAL_CAN_MspInit(CAN_HandleTypeDef* CanHandle)
 {
   GPIO_InitTypeDef GPIO_InitStruct;
 
-	/* CAN1 Periph clock enable */
-	PSB_CAN_CLK_ENABLE();
-	/* Enable GPIO clock ****************************************/
-	PSB_CAN_GPIO_CLK_ENABLE();
-    /* Enable AFIO clock and Remap CAN PINs to PB8 and PB9*******/
-	PSB_CAN_AFIO_REMAP_CLK_ENABLE();
-	PSB_CAN_AFIO_REMAP_RX_TX_PIN();
+  /* CAN1 Periph clock enable */
+  __HAL_RCC_CAN1_CLK_ENABLE();
 
-    /**CAN1 GPIO Configuration    
-    PB8     ------> CAN1_RX
-    PB9     ------> CAN1_TX
-    */
+  /* Enable GPIO clock */
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    /* CAN1 TX GPIO pin configuration */
-    GPIO_InitStruct.Pin = PSB_CAN_TX_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
+  /* Enable AFIO clock and remap CAN PINs to PB_8 and PB_9*/
+  __HAL_RCC_AFIO_CLK_ENABLE();
+  __HAL_AFIO_REMAP_CAN1_2();
 
-    HAL_GPIO_Init(PSB_CAN_TX_GPIO_PORT, &GPIO_InitStruct);
+  /* CAN1 RX GPIO pin configuration */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* CAN1 RX GPIO pin configuration */
-    GPIO_InitStruct.Pin = PSB_CAN_RX_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    HAL_GPIO_Init(PSB_CAN_RX_GPIO_PORT, &GPIO_InitStruct);
 
     /* Peripheral interrupt init */
 //    HAL_NVIC_SetPriority(PSB_CAN_TX_IRQn, 0, 0);
 //    HAL_NVIC_EnableIRQ(PSB_CAN_TX_IRQn);
 
-    HAL_NVIC_SetPriority(PSB_CAN_RX0_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(PSB_CAN_RX0_IRQn);
+    HAL_NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
 
     HAL_NVIC_SetPriority(PSB_CAN_RX1_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(PSB_CAN_RX1_IRQn);
@@ -427,7 +423,7 @@ void HAL_CAN_MspDeInit(CAN_HandleTypeDef* hcan)
   
     /**CAN1 GPIO Configuration    
     PA11     ------> CAN1_RX
-    PA12     ------> CAN1_TX 
+    PA12     ------> CAN1_TX
     */
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_11|GPIO_PIN_12);
 
@@ -442,6 +438,51 @@ void HAL_CAN_MspDeInit(CAN_HandleTypeDef* hcan)
 
   }
 }
+
+int CANx_Write(CAN_Message *TXmsg)
+{
+	 int i = 0;
+
+	    if(TXmsg->format== CANStandard) {
+	        CanHandle.pTxMsg->StdId = TXmsg->id;
+	        CanHandle.pTxMsg->ExtId = 0x00;
+	    }
+	    else {
+	        CanHandle.pTxMsg->StdId = 0x00;
+	        CanHandle.pTxMsg->ExtId = TXmsg->id;
+	    }
+
+	    CanHandle.pTxMsg->RTR = TXmsg->type == CANData ? CAN_RTR_DATA : CAN_RTR_REMOTE;
+	    CanHandle.pTxMsg->IDE = TXmsg->format == CANStandard ? CAN_ID_STD : CAN_ID_EXT;
+	    CanHandle.pTxMsg->DLC = TXmsg->len;
+
+	    for(i = 0; i < TXmsg->len; i++)
+	        CanHandle.pTxMsg->Data[i] = TXmsg->data[i];
+
+	    if(HAL_CAN_Transmit(&CanHandle, 10) != HAL_OK) {
+	#ifdef DEBUG
+	        printf("Transmission error\r\n");
+	#endif
+	        return 0;
+	    }
+	    else
+	        return 1;
+}
+
+int CANx_Read(CAN_Message *RXmsg)
+{
+    int i;
+    RXmsg->id = CanHandle.pRxMsg->IDE == CAN_ID_STD ? CanHandle.pRxMsg->StdId : CanHandle.pRxMsg->ExtId;
+    RXmsg->type = CanHandle.pRxMsg->RTR == CAN_RTR_DATA ? CANData : CANRemote;
+    RXmsg->format = CanHandle.pRxMsg->IDE == CAN_ID_STD ? CANStandard : CANExtended;
+    RXmsg->len = CanHandle.pRxMsg->DLC;
+    for(i = 0; i < RXmsg->len; i++)
+        RXmsg->data[i] = CanHandle.pRxMsg->Data[i];
+
+    return RXmsg->len;
+}
+
+
 
 #endif /* HAL_CAN_MODULE_ENABLED */
 

@@ -84,6 +84,9 @@ void CANx_RX0_IRQHandler(void);
 void CANx_RX1_IRQHandler(void);
 void CANx_SCE_IRQHandler(void);
 void RTC_Alarm_IRQHandler(void);
+void USB_LP_CAN1_RX0_IRQHandler(void);
+
+
 
 void USARTx_DMA_TX_IRQHandler(void);
 void USARTx_DMA_RX_IRQHandler(void);

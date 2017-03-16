@@ -208,6 +208,9 @@ void USARTx_DMA_RX_IRQHandler(void)
 
 }
 
+void USB_LP_CAN1_RX0_IRQHandler(void) {
+    HAL_CAN_IRQHandler(&CanHandle);
+}
 
 void CANx_TX_IRQHandler(void)
 {
